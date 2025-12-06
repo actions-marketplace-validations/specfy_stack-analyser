@@ -1,9 +1,14 @@
-import { register } from '../../../rules.js';
-
 import { detectDockerComponent } from './component.js';
+import { register } from '../../../register.js';
 
 register({
   tech: 'docker',
-  files: ['.dockerignore', 'Dockerfile', 'docker-compose.yml'],
+  name: 'Docker',
+  type: 'tool',
+  files: ['.dockerignore', 'Dockerfile', 'docker-compose.yml', 'docker-compose.yaml'],
   detect: detectDockerComponent,
+  dependencies: [
+    { type: 'githubAction', name: 'docker/login-action' },
+    { type: 'npm', name: '@pulumi/docker' },
+  ],
 });

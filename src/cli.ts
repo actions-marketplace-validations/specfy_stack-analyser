@@ -3,72 +3,70 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import timer from 'node:timers/promises';
+import { fileURLToPath } from 'node:url';
 
 import { Command } from 'commander';
-import figures from 'figures';
+import figureSet from 'figures';
 import kleur from 'kleur';
 import ora from 'ora';
 
 import { analyser } from './analyser/index.js';
+import { l } from './common/log.js';
+import { flatten } from './payload/helpers.js';
 import { FSProvider } from './provider/fs.js';
 
+import './autoload.js';
+
 const program = new Command();
+
+const filename = fileURLToPath(import.meta.url);
+const dirname = path.dirname(filename);
+// eslint-disable-next-line unicorn/no-await-expression-member
+const pkg = JSON.parse((await fs.readFile(path.join(dirname, './../package.json'))).toString()) as {
+  version: string;
+};
 
 program
   .name('stack-analyser')
   .description('CLI to extract metadata from repository')
-  .argument('<path>', 'repository to analyse')
+  .argument('<path>', 'repository to analyze')
   .option('-o, --output <FILENAME>', 'output json to a file', 'output.json')
-  .version('1.0.1')
-  .action(async (arg, options) => {
-    const here = process.cwd();
-    const root = path.join(here, arg);
+  .option('--flat', 'flatten the output', false)
+  .version(pkg.version)
+  .action(async (arg: string, options: { output?: string; flat: boolean }) => {
+    const pathAtExecution = process.cwd();
+    const root = path.isAbsolute(arg) ? arg : path.join(pathAtExecution, arg);
+
+    l.debug('Version', pkg.version);
 
     try {
       const stat = await fs.stat(root);
       if (!stat.isDirectory()) {
-        console.log(
-          kleur.bold().red(figures.cross),
-          `Path "${root}" is not a folder`
-        );
+        l.log(kleur.bold().red(figureSet.cross), `Path "${root}" is not a folder`);
         process.exit(1);
       }
-    } catch (e) {
-      console.log(
-        kleur.bold().red(figures.cross),
-        `Path "${root}" does not exist`
-      );
+    } catch {
+      l.log(kleur.bold().red(figureSet.cross), `Path "${root}" does not exist`);
       process.exit(1);
     }
 
-    console.log(kleur.bold().magenta(figures.triangleRight), kleur.cyan(root));
+    l.log(kleur.bold().magenta(figureSet.triangleRight), 'Path', kleur.cyan(root));
 
     const spinner = ora(`Analysing`).start();
 
     await timer.setTimeout(500);
     const res = await analyser({
-      provider: new FSProvider({
-        path: root,
-        ignorePaths: [],
-      }),
+      provider: new FSProvider({ path: root, ignorePaths: [] }),
     });
     spinner.succeed('Analysed');
 
     if (options.output) {
-      const file = path.join(here, options.output);
-      await fs.writeFile(file, JSON.stringify(res.toJson(root), undefined, 2));
-      console.log('');
-      console.log('Output', kleur.green(file));
+      const output = options.flat ? flatten(res, { merge: true }) : res;
+      const file = path.join(pathAtExecution, options.output);
+      await fs.writeFile(file, JSON.stringify(output.toJson(root), undefined, 2));
+      l.log('');
+      l.log('Output', kleur.green(file));
     }
   });
-
-// program
-//   .command('github')
-//   .description('Extract a Github repository using the API')
-//   .argument('<repository>', 'repository to analyse')
-//   .option('--output', 'output json to a file', 'output.json')
-//   .action(() => {
-//     console.log('action, github');
-//   });
 
 program.parse(process.argv);

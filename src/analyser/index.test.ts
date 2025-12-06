@@ -1,13 +1,14 @@
 import path from 'node:path';
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { analyser } from './index.js';
 import { flatten } from '../payload/helpers.js';
 import { FakeProvider } from '../provider/fake.js';
 import { FSProvider } from '../provider/fs.js';
-import type { AnalyserJson } from '../types/index.js';
 
-import { analyser } from './index.js';
+import type { AnalyserJson } from '../types/index.js';
+import '../autoload.js';
 
 const dockerCompose = `version: '3'
 services:
@@ -43,7 +44,6 @@ describe('analyser', () => {
     expect(res.toJson('')).toStrictEqual({
       id: expect.any(String),
       name: 'main',
-      group: 'component',
       edges: [],
       inComponent: null,
       languages: {},
@@ -51,7 +51,9 @@ describe('analyser', () => {
       tech: null,
       techs: [],
       childs: [],
+      licenses: [],
       dependencies: [],
+      reason: [],
     });
   });
 
@@ -68,14 +70,15 @@ describe('analyser', () => {
       }),
     });
 
-    const flat = flatten(res);
-    const json: AnalyserJson = JSON.parse(JSON.stringify(flat.toJson('')));
+    const flat = flatten(res, { merge: true });
+    const json: AnalyserJson = structuredClone(flat.toJson(''));
+
     expect(json).toMatchSnapshot();
-    expect(flat.childs[0].id).toEqual(flat.childs[1].edges[0].to.id);
+    expect(flat.childs[0].id).toBe(flat.childs[1].edges[0].target.id);
   });
 
   it('should run correctly', async () => {
-    const root = path.join(__dirname, '../../tests/__fixtures__');
+    const root = path.join(import.meta.dirname, '../../tests/__fixtures__');
     const res = await analyser({
       provider: new FSProvider({
         path: root,
@@ -84,18 +87,20 @@ describe('analyser', () => {
 
     expect(res.toJson(root)).toMatchSnapshot();
 
-    const flatted = flatten(res);
+    const flatted = flatten(res, { merge: true });
 
     // Check that inComponent was updated
-    const vercel = flatted.childs.find((child) => child.name === 'vercel')!;
+    const vercel = flatted.childs.find((child) => child.name === 'Vercel')!;
     const app = flatted.childs.find((child) => child.name === '@fake/app');
+
     expect(app!.inComponent!.id).toBe(vercel.id);
 
-    // Check that edge.to was updated
-    const datadog = flatted.childs.find((child) => child.name === 'datadog')!;
+    // Check that edge.target was updated
+    const datadog = flatted.childs.find((child) => child.name === 'Datadog')!;
     const api = flatted.childs.find((child) => child.name === '@fake/api');
-    expect(api!.edges[0].to.id).toBe(datadog.id);
 
-    expect(JSON.parse(JSON.stringify(flatted.toJson(root)))).toMatchSnapshot();
+    expect(api!.edges[0].target.id).toBe(datadog.id);
+
+    expect(structuredClone(flatted.toJson(root))).toMatchSnapshot();
   });
 });

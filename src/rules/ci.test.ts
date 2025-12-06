@@ -1,47 +1,53 @@
 import { describe, expect, it } from 'vitest';
 
 import { analyser } from '../analyser/index.js';
-import { listIndexed } from '../common/techs.js';
+import { rawList } from '../loader.js';
 import { FakeProvider } from '../provider/fake.js';
-import { rawList } from '../rules.js';
-import './index.js';
+import { listIndexed } from '../register.js';
 
-const paths: string[] = [];
-for (const item of rawList) {
-  if (
-    item.type !== 'file' ||
-    listIndexed[item.ref.tech].type !== 'ci' ||
-    !item.ref.files
-  ) {
-    continue;
-  }
+import type { AllowedKeys } from '../index.js';
+import '../autoload.js';
 
-  paths.push('example' in item.ref ? item.ref.example : item.ref.files[0]);
-}
-
-describe('npm', () => {
+describe('ci', () => {
   it('should match everything', async () => {
+    const paths: string[] = [];
+    for (const item of rawList) {
+      if (item.type !== 'file' || listIndexed[item.ref.tech].type !== 'ci' || !item.ref.files) {
+        continue;
+      }
+
+      paths.push('example' in item.ref ? item.ref.example : item.ref.files[0]);
+    }
+
     const res = await analyser({
       provider: new FakeProvider({
         paths: {
           '/': paths,
         },
-        files: {},
+        files: {
+          '/.github/workflows/ci.yml': '', // we open this file
+        },
       }),
     });
-    expect(res.toJson('').techs).toStrictEqual([
-      'browserstack',
-      'circleci',
-      'codesandboxci',
-      'cypressci',
-      'dependabot',
-      'githubactions',
-      'javascript',
-      'jenkins',
-      'relativeci',
-      'renovate',
-      'teamcity',
-      'travisci',
-    ]);
+
+    expect(res.toJson('').techs).toMatchSnapshot();
+  });
+
+  it('should enforce that we match .github', async () => {
+    const res = await analyser({
+      provider: new FakeProvider({
+        paths: {
+          '/': ['.github/'],
+          '/.github': ['workflows/'],
+          '/.github/workflows': ['main.yml'],
+        },
+        files: {
+          '/.github/workflows/main.yml': '',
+        },
+      }),
+    });
+    const match: AllowedKeys[] = ['github', 'github.actions'];
+
+    expect(res.toJson('').techs).toStrictEqual(match);
   });
 });

@@ -1,73 +1,56 @@
-import { analyser } from './analyser/index.js';
-import {
-  listIndexed as listTechIndexed,
-  list as listTech,
-} from './common/techs.js';
-import {
-  flatten,
-  findEdgesInDependencies,
-  findHosting,
-  findImplicitComponent,
-} from './payload/helpers.js';
-import { Payload } from './payload/index.js';
-import { BaseProvider } from './provider/base.js';
-import { FakeProvider } from './provider/fake.js';
-import { FSProvider, FSProviderOptions } from './provider/fs.js';
-import {
-  GithubAPIProvider,
-  GithubAPIProviderOptions,
-} from './provider/githubApi.js';
-import {
+import { detectLang, rawList as languageList } from './common/languages.js';
+import { listIndexed, listTech } from './common/techs.generated.js';
+import { dependencies as dependenciesList, loadAllRules, loadOne, rawList } from './loader.js';
+import { matchAllFiles } from './matchAllFiles.js';
+import { matchDependencies } from './matchDependencies.js';
+import { register, registeredRules, registeredTech } from './register.js';
+
+export const rules = {
   register,
-  detect,
-  rawList,
-  dependencies as dependenciesList,
-} from './rules.js';
-import { Analyser, ComponentGroup } from './types/index.js';
-import {
-  SupportedDeps,
-  RuleDependency,
-  Rule,
-  RuleWithFile,
-  ComponentMatcher,
-  TechMatcher,
-} from './types/rule.js';
-import { TechType, AllowedKeys, TechItem } from './types/techs.js';
-
-export {
-  AllowedKeys,
-  Analyser,
-  BaseProvider,
-  ComponentGroup,
-  ComponentMatcher,
-  FakeProvider,
-  FSProvider,
-  FSProviderOptions,
-  GithubAPIProvider,
-  GithubAPIProviderOptions,
-  Payload,
-  Rule,
-  RuleDependency,
-  RuleWithFile,
-  SupportedDeps,
-  TechItem,
-  TechMatcher,
-  TechType,
+  list: registeredRules,
+  loadAll: loadAllRules,
+  loadOne,
 };
-
-export {
-  analyser,
-  flatten,
-  findEdgesInDependencies,
-  findHosting,
-  findImplicitComponent,
-};
-
 export const dependencies = {
-  register,
-  detect,
+  detect: matchDependencies,
   raw: rawList,
   list: dependenciesList,
 };
 
-export const tech = { indexed: listTechIndexed, list: listTech };
+export const tech = {
+  detectInFileList: matchAllFiles,
+  indexed: listIndexed,
+  list: listTech,
+  keys: registeredTech,
+};
+
+export const lang = {
+  detect: detectLang,
+  list: languageList,
+};
+
+export { analyser } from './analyser/index.js';
+export type { LangListItem } from './common/languages.js';
+export {
+  findEdgesInDependencies,
+  findHosting,
+  findImplicitComponent,
+  flatten,
+} from './payload/helpers.js';
+export { Payload } from './payload/index.js';
+
+export type { BaseProvider, ProviderFile } from './provider/base.js';
+export { FakeProvider } from './provider/fake.js';
+export type { FSProviderOptions } from './provider/fs.js';
+export { FSProvider } from './provider/fs.js';
+export type { Analyser, AnalyserJson, Dependency, GraphEdge } from './types/index.js';
+
+export type { SupportedDeps } from './types/rule.js';
+export type {
+  ComponentMatcher,
+  Rule,
+  RuleDependency,
+  RuleWithFile,
+  TechMatcher,
+} from './types/rule.js';
+export type { AllowedKeys, TechItem, TechType } from './types/techs.js';

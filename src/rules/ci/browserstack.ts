@@ -1,7 +1,12 @@
-import { register } from '../../rules.js';
+import { register } from '../../register.js';
 
 register({
   tech: 'browserstack',
-  files: ['browserstack.json'],
-  dependencies: [{ type: 'npm', name: 'browserstack' }],
+  name: 'Browserstack',
+  type: 'ci',
+  files: ['browserstack.json', 'browserstack.yml'],
+  dependencies: [
+    { type: 'npm', name: 'browserstack' },
+    { type: 'ruby', name: 'browserstack-local' },
+  ],
 });

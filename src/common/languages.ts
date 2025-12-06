@@ -1,12 +1,14 @@
-type ListItem = {
+import path from 'node:path';
+
+export interface LangListItem {
   extensions: string[];
-  group: string | null;
+  group: null | string;
   name: string;
   type: 'data' | 'markup' | 'programming' | 'prose';
-};
+}
 
 // Source: https://github.com/github/linguist/blob/5a0c74277548122267d84283910abd5e0b89380e/lib/linguist/languages.yml#L1528
-export const rawList: ListItem[] = [
+export const rawList: LangListItem[] = [
   {
     extensions: ['.bsl', '.os'],
     group: null,
@@ -120,12 +122,6 @@ export const rawList: ListItem[] = [
     group: null,
     name: 'Ada',
     type: 'programming',
-  },
-  {
-    extensions: ['.txt'],
-    group: null,
-    name: 'Adblock Filter List',
-    type: 'data',
   },
   {
     extensions: ['.afm'],
@@ -664,16 +660,7 @@ export const rawList: ListItem[] = [
     type: 'programming',
   },
   {
-    extensions: [
-      '.lisp',
-      '.asd',
-      '.cl',
-      '.l',
-      '.lsp',
-      '.ny',
-      '.podsl',
-      '.sexp',
-    ],
+    extensions: ['.lisp', '.asd', '.cl', '.l', '.lsp', '.ny', '.podsl', '.sexp'],
     group: null,
     name: 'Common Lisp',
     type: 'programming',
@@ -703,13 +690,7 @@ export const rawList: ListItem[] = [
     type: 'programming',
   },
   {
-    extensions: [
-      '.cppobjdump',
-      '.c++-objdump',
-      '.c++objdump',
-      '.cpp-objdump',
-      '.cxx-objdump',
-    ],
+    extensions: ['.cppobjdump', '.c++-objdump', '.c++objdump', '.cpp-objdump', '.cxx-objdump'],
     group: null,
     name: 'Cpp-ObjDump',
     type: 'data',
@@ -955,12 +936,6 @@ export const rawList: ListItem[] = [
     type: 'data',
   },
   {
-    extensions: ['.html'],
-    group: 'HTML',
-    name: 'Ecmarkup',
-    type: 'markup',
-  },
-  {
     extensions: ['.editorconfig'],
     group: 'INI',
     name: 'EditorConfig',
@@ -1009,16 +984,7 @@ export const rawList: ListItem[] = [
     type: 'programming',
   },
   {
-    extensions: [
-      '.erl',
-      '.app',
-      '.app.src',
-      '.es',
-      '.escript',
-      '.hrl',
-      '.xrl',
-      '.yrl',
-    ],
+    extensions: ['.erl', '.app', '.app.src', '.es', '.escript', '.hrl', '.xrl', '.yrl'],
     group: null,
     name: 'Erlang',
     type: 'programming',
@@ -1490,7 +1456,7 @@ export const rawList: ListItem[] = [
     type: 'data',
   },
   {
-    extensions: ['.hack', '.hh', '.hhi', '.php'],
+    extensions: ['.hack', '.hh', '.hhi'],
     group: null,
     name: 'Hack',
     type: 'programming',
@@ -2011,12 +1977,6 @@ export const rawList: ListItem[] = [
     type: 'data',
   },
   {
-    extensions: ['.mod'],
-    group: null,
-    name: 'Linux Kernel Module',
-    type: 'data',
-  },
-  {
     extensions: ['.liquid'],
     group: null,
     name: 'Liquid',
@@ -2071,16 +2031,7 @@ export const rawList: ListItem[] = [
     type: 'programming',
   },
   {
-    extensions: [
-      '.lua',
-      '.fcgi',
-      '.nse',
-      '.p8',
-      '.pd_lua',
-      '.rbxs',
-      '.rockspec',
-      '.wlua',
-    ],
+    extensions: ['.lua', '.fcgi', '.nse', '.p8', '.pd_lua', '.rbxs', '.rockspec', '.wlua'],
     group: null,
     name: 'Lua',
     type: 'programming',
@@ -2195,17 +2146,7 @@ export const rawList: ListItem[] = [
     type: 'markup',
   },
   {
-    extensions: [
-      '.mathematica',
-      '.cdf',
-      '.m',
-      '.ma',
-      '.mt',
-      '.nb',
-      '.nbp',
-      '.wl',
-      '.wlt',
-    ],
+    extensions: ['.mathematica', '.cdf', '.m', '.ma', '.mt', '.nb', '.nbp', '.wl', '.wlt'],
     group: null,
     name: 'Mathematica',
     type: 'programming',
@@ -2743,18 +2684,7 @@ export const rawList: ListItem[] = [
     type: 'programming',
   },
   {
-    extensions: [
-      '.pl',
-      '.al',
-      '.cgi',
-      '.fcgi',
-      '.perl',
-      '.ph',
-      '.plx',
-      '.pm',
-      '.psgi',
-      '.t',
-    ],
+    extensions: ['.pl', '.al', '.cgi', '.fcgi', '.perl', '.ph', '.plx', '.pm', '.psgi', '.t'],
     group: null,
     name: 'Perl',
     type: 'programming',
@@ -3018,14 +2948,7 @@ export const rawList: ListItem[] = [
     type: 'prose',
   },
   {
-    extensions: [
-      '.rbbas',
-      '.rbfrm',
-      '.rbmnu',
-      '.rbres',
-      '.rbtbar',
-      '.rbuistate',
-    ],
+    extensions: ['.rbbas', '.rbfrm', '.rbmnu', '.rbres', '.rbtbar', '.rbuistate'],
     group: null,
     name: 'REALbasic',
     type: 'programming',
@@ -3159,7 +3082,7 @@ export const rawList: ListItem[] = [
     type: 'programming',
   },
   {
-    extensions: ['.rs', '.rsh'],
+    extensions: ['.rsh'],
     group: null,
     name: 'RenderScript',
     type: 'programming',
@@ -3334,17 +3257,7 @@ export const rawList: ListItem[] = [
     type: 'programming',
   },
   {
-    extensions: [
-      '.sql',
-      '.cql',
-      '.ddl',
-      '.inc',
-      '.mysql',
-      '.prc',
-      '.tab',
-      '.udf',
-      '.viw',
-    ],
+    extensions: ['.sql', '.cql', '.ddl', '.inc', '.mysql', '.prc', '.tab', '.udf', '.viw'],
     group: null,
     name: 'SQL',
     type: 'data',
@@ -3804,15 +3717,7 @@ export const rawList: ListItem[] = [
     type: 'programming',
   },
   {
-    extensions: [
-      '.anim',
-      '.asset',
-      '.mask',
-      '.mat',
-      '.meta',
-      '.prefab',
-      '.unity',
-    ],
+    extensions: ['.anim', '.asset', '.mask', '.mat', '.meta', '.prefab', '.unity'],
     group: null,
     name: 'Unity3D Asset',
     type: 'data',
@@ -3866,16 +3771,7 @@ export const rawList: ListItem[] = [
     type: 'programming',
   },
   {
-    extensions: [
-      '.vhdl',
-      '.vhd',
-      '.vhf',
-      '.vhi',
-      '.vho',
-      '.vhs',
-      '.vht',
-      '.vhw',
-    ],
+    extensions: ['.vhdl', '.vhd', '.vhf', '.vhi', '.vho', '.vhs', '.vht', '.vhw'],
     group: null,
     name: 'VHDL',
     type: 'programming',
@@ -3903,12 +3799,6 @@ export const rawList: ListItem[] = [
     group: null,
     name: 'Verilog',
     type: 'programming',
-  },
-  {
-    extensions: ['.txt'],
-    group: null,
-    name: 'Vim Help File',
-    type: 'prose',
   },
   {
     extensions: ['.vim', '.vba', '.vimrc', '.vmb'],
@@ -4122,7 +4012,6 @@ export const rawList: ListItem[] = [
       '.rdf',
       '.res',
       '.resx',
-      '.rs',
       '.rss',
       '.sch',
       '.scxml',
@@ -4134,7 +4023,6 @@ export const rawList: ListItem[] = [
       '.sw',
       '.targets',
       '.tml',
-      '.ts',
       '.tsx',
       '.ui',
       '.urdf',
@@ -4453,3 +4341,28 @@ export const rawList: ListItem[] = [
 
 export const languages = rawList.filter((l) => l.type === 'programming');
 export const others = rawList.filter((l) => l.type !== 'programming');
+
+/**
+ * Detect language of a file at this level.
+ */
+export function detectLang(filename: string): LangListItem | null {
+  const ext = path.extname(filename);
+
+  for (const lang of languages) {
+    if (!lang.extensions.includes(ext)) {
+      continue;
+    }
+
+    return lang;
+  }
+
+  for (const lang of others) {
+    if (!lang.extensions.includes(ext)) {
+      continue;
+    }
+
+    return lang;
+  }
+
+  return null;
+}

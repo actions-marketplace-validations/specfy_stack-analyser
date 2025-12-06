@@ -7,10 +7,7 @@ export class FakeProvider implements BaseProvider {
   private paths;
   private files;
 
-  constructor(opts: {
-    paths: Record<string, string[]>;
-    files: Record<string, string>;
-  }) {
+  constructor(opts: { paths: Record<string, string[]>; files: Record<string, string> }) {
     this.paths = opts.paths;
     this.files = opts.files;
     this.basePath = '/';
@@ -24,13 +21,18 @@ export class FakeProvider implements BaseProvider {
     const files = this.paths[pathRelative].sort();
     return Promise.resolve(
       files.map((file) => {
+        const isDir = file.endsWith('/');
         return {
-          name: file,
-          type: file.endsWith('/') ? 'dir' : 'file',
+          name: isDir ? file.slice(0, Math.max(0, file.length - 1)) : file,
+          type: isDir ? 'dir' : 'file',
           fp: path.join(pathRelative, file),
         };
       })
     );
+  }
+
+  stat(): Promise<{ size: number }> {
+    return Promise.resolve({ size: 1000 });
   }
 
   open(pathRelative: string): Promise<string> {

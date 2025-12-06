@@ -1,18 +1,17 @@
-import type { FullVersion } from 'package-json';
-
+import { l } from '../../../common/log.js';
+import { matchDependencies } from '../../../matchDependencies.js';
 import { Payload } from '../../../payload/index.js';
-import { detect } from '../../../rules.js';
+import { detectLicense } from '../licenses/index.js';
+
 import type { Analyser } from '../../../types/index.js';
 import type { ComponentMatcher } from '../../../types/rule.js';
+import type { FullVersion } from 'package-json';
 
-const FILES = ['package.json'];
+const FILES = new Set(['package.json']);
 
-export const detectNodeComponent: ComponentMatcher = async (
-  files,
-  provider
-) => {
+export const detectNodeComponent: ComponentMatcher = async (files, provider) => {
   for (const file of files) {
-    if (!FILES.includes(file.name)) {
+    if (!FILES.has(file.name)) {
       continue;
     }
 
@@ -23,24 +22,24 @@ export const detectNodeComponent: ComponentMatcher = async (
 
     let json: FullVersion;
     try {
-      json = JSON.parse(content);
-    } catch (e) {
-      console.error('cant parse package.json', file.fp, e);
-      return false;
+      json = JSON.parse(content) as FullVersion;
+    } catch (err) {
+      l.warn('Failed to parse package.json', file.fp, err);
+      continue;
     }
 
     if (!json.name) {
-      return false;
+      continue;
     }
 
     const deps = {
-      ...(json.dependencies || {}),
-      ...(json.devDependencies || {}),
+      ...json.dependencies,
+      ...json.devDependencies,
     };
-    const techs = detect(Object.keys(deps), 'npm');
+    const techs = matchDependencies(Object.keys(deps), 'npm');
     const depsFlatten: Analyser['dependencies'] = Object.entries(deps).map(
-      (dep: [string, string]) => {
-        return ['npm', dep[0], dep[1]];
+      (dep: [string, string | undefined]) => {
+        return ['npm', dep[0], dep[1] ?? ''];
       }
     );
 
@@ -49,7 +48,14 @@ export const detectNodeComponent: ComponentMatcher = async (
       folderPath: file.fp,
       dependencies: depsFlatten,
     });
-    pl.addTechs([...techs]);
+    pl.addTechs(techs);
+
+    if (json.license && typeof json.license === 'string') {
+      const lic = detectLicense(json.license);
+      if (lic !== false) {
+        pl.addLicenses(lic);
+      }
+    }
 
     return pl;
   }

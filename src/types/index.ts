@@ -1,17 +1,16 @@
-import type { Payload } from '../payload/index.js';
-
+import type { AllowedLicenses } from './licenses.js';
 import type { SupportedDeps } from './rule.js';
 import type { AllowedKeys } from './techs.js';
 import type { Modify } from './utils.js';
+import type { Payload } from '../payload/index.js';
 
 export interface GraphEdge {
-  to: Payload;
+  target: Payload;
   read: boolean;
   write: boolean;
-  vertices: Array<{ x: number; y: number }>;
-  portSource: 'bottom' | 'left' | 'right' | 'top';
-  portTarget: 'bottom' | 'left' | 'right' | 'top';
 }
+
+export type Dependency = [SupportedDeps, string, string];
 
 export interface Analyser {
   /**
@@ -25,15 +24,10 @@ export interface Analyser {
   name: string;
 
   /**
-   * To which main group this payload belongs to.
-   */
-  group: ComponentGroup;
-
-  /**
    * Where this payload was found.
    * When flatten() it will contain all path that were deduplicated
    */
-  path: string[];
+  path: Set<string>;
 
   /**
    * If this payload is a specific Technology.
@@ -51,7 +45,7 @@ export interface Analyser {
    * If this payload is hosted by another payload.
    * e.g: we found a vercel dependency at the same level, this payload will be considered in the component Vercel.
    */
-  inComponent: Payload | null;
+  inComponent: null | Payload;
 
   /**
    * List all childs of this payload
@@ -65,6 +59,12 @@ export interface Analyser {
   languages: Record<string, number>;
 
   /**
+   * List all languages found in this folder.
+   * This list is computed using file extensions.
+   */
+  licenses: Set<AllowedLicenses>;
+
+  /**
    * List all relationship from this Payload to another one.
    * e.g:
    * this is a package.json and we found a Postgresql at the same level,
@@ -75,17 +75,18 @@ export interface Analyser {
   /**
    * List all dependencies wether or not they matched a rule.
    */
-  dependencies: Array<[SupportedDeps, string, string]>;
+  dependencies: Dependency[];
 }
 
 export type AnalyserJson = Modify<
   Analyser,
   {
     childs: AnalyserJson[];
+    path: string[];
     techs: AllowedKeys[];
-    inComponent: string | null;
-    edges: Array<Modify<GraphEdge, { to: string }>>;
+    licenses: AllowedLicenses[];
+    inComponent: null | string;
+    edges: Modify<GraphEdge, { target: string }>[];
+    reason: string[];
   }
 >;
-
-export type ComponentGroup = 'component' | 'hosting' | 'project' | 'thirdparty';

@@ -1,0 +1,9 @@
+import './jest.js';
+import './k6.js';
+import './lighthouse.js';
+import './mochajs.js';
+import './phppest.js';
+import './phpunit.js';
+import './storybook.js';
+import './testinglibrary.js';
+import './vitest.js';

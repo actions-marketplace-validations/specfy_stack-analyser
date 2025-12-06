@@ -1,0 +1,32 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ci > should match everything 1`] = `
+[
+  "appveyor",
+  "atlassian.bitbucketpipelines",
+  "azure.ci",
+  "browserstack",
+  "circleci",
+  "cirrusci",
+  "cloudbees.codeship",
+  "codeclimate",
+  "codecov",
+  "codesandboxci",
+  "concourseci",
+  "cypressci",
+  "deepsource",
+  "dependabot",
+  "depotdev",
+  "droneci",
+  "github.actions",
+  "gitlab.ci",
+  "javascript",
+  "jenkins",
+  "relativeci",
+  "renovate",
+  "sonarqube",
+  "styleci",
+  "teamcity",
+  "travisci",
+]
+`;

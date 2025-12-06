@@ -1,26 +1,26 @@
 import { describe, expect, it } from 'vitest';
 
 import { analyser } from '../analyser/index.js';
-import { listIndexed } from '../common/techs.js';
+import { rawList } from '../loader.js';
 import { FakeProvider } from '../provider/fake.js';
-import { rawList } from '../rules.js';
-import './index.js';
+import { listIndexed } from '../register.js';
+import '../autoload.js';
 
-const paths: string[] = [];
-for (const item of rawList) {
-  if (
-    item.type !== 'file' ||
-    listIndexed[item.ref.tech].type !== 'hosting' ||
-    !item.ref.files
-  ) {
-    continue;
-  }
+describe('hosting', () => {
+  it('should match everything with files', async () => {
+    const paths: string[] = [];
+    for (const item of rawList) {
+      if (
+        item.type !== 'file' ||
+        listIndexed[item.ref.tech].type !== 'hosting' ||
+        !item.ref.files
+      ) {
+        continue;
+      }
 
-  paths.push('example' in item.ref ? item.ref.example : item.ref.files[0]);
-}
+      paths.push('example' in item.ref ? item.ref.example : item.ref.files[0]);
+    }
 
-describe('npm', () => {
-  it('should match everything', async () => {
     const res = await analyser({
       provider: new FakeProvider({
         paths: {
@@ -29,13 +29,7 @@ describe('npm', () => {
         files: {},
       }),
     });
-    expect(res.toJson('').techs).toStrictEqual([
-      'expodev',
-      'flyio',
-      'githubpages',
-      'netlify',
-      'render',
-      'vercel',
-    ]);
+
+    expect(res.toJson('').techs).toMatchSnapshot();
   });
 });

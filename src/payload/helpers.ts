@@ -1,7 +1,25 @@
-import { listIndexed } from '../common/techs.js';
-import type { AllowedKeys } from '../types/techs.js';
-
+import { listIndexed } from '../register.js';
 import { Payload } from './index.js';
+
+import type { AllowedKeys, TechType } from '../types/techs.js';
+
+const notAComponent = new Set<TechType>([
+  'ci',
+  'language',
+  'runtime',
+  'tool',
+  'framework',
+  'validation',
+  'builder',
+  'linter',
+  'test',
+  'orm',
+  'package_manager',
+  'orm',
+  'ui',
+  'ui_framework',
+  'iac',
+]);
 
 /**
  * When receive a tech in a component, we can deduct a new Component that was missing
@@ -12,20 +30,29 @@ import { Payload } from './index.js';
  *
  * Obviously there could be some false positive.
  */
-export function findImplicitComponent(pl: Payload, tech: AllowedKeys) {
+export function findImplicitComponent({
+  pl,
+  tech,
+  reason,
+}: {
+  pl: Payload;
+  tech: AllowedKeys;
+  reason: string[];
+}): void {
   const ref = listIndexed[tech];
-  if (ref.type === 'ci' || ref.type === 'language' || ref.type === 'tool') {
+  if (notAComponent.has(ref.type)) {
     return;
   }
 
   const comp = new Payload({
-    name: tech,
+    name: ref.name,
     tech: tech,
-    folderPath: pl.path[0],
+    folderPath: pl.path,
     parent: pl,
+    reason,
   });
   pl.addChild(comp);
-  if (comp.group !== 'hosting') {
+  if (ref.type !== 'hosting' && ref.type !== 'cloud') {
     pl.addEdges(comp);
   }
 }
@@ -39,15 +66,15 @@ export function findImplicitComponent(pl: Payload, tech: AllowedKeys) {
  *
  * Obviously there could be some false positive.
  */
-export function findHosting(pl: Payload, tech: AllowedKeys) {
+export function findHosting(pl: Payload, tech: AllowedKeys): void {
   const ref = listIndexed[tech];
-  if (ref.type !== 'hosting') {
+  if (ref.type !== 'hosting' && ref.type !== 'cloud') {
     return;
   }
 
-  const find = pl.childs.find((c) => c.tech === ref.key);
+  const find = pl.childs.find((c) => c.tech === ref.tech);
   if (!find) {
-    throw new Error(`cant find hosting ${ref.key}`);
+    throw new Error(`cant find hosting ${ref.tech}`);
   }
 
   pl.inComponent = find;
@@ -60,74 +87,79 @@ export function findHosting(pl: Payload, tech: AllowedKeys) {
  * We try to find those import, using only the dependencies (not opening the code),
  * it can lead to some false positive with very generic names.
  */
-export function findEdgesInDependencies(pl: Payload) {
+export function findEdgesInDependencies(pl: Payload): void {
   const names = new Set<string>();
-  pl.childs.forEach((child) => names.add(child.name));
+  for (const child of pl.childs) names.add(child.name);
 
-  pl.childs.forEach((child) => {
-    child.dependencies.forEach((dep) => {
+  for (const child of pl.childs) {
+    for (const dep of child.dependencies) {
       const name = dep[1];
       if (!names.has(name)) {
-        return;
+        continue;
       }
 
       // Self referencing
       if (name === child.name || name === child.tech) {
-        return;
+        continue;
       }
 
       // Check if we already added an edge about that
-      const already = child.edges.find((edge) => edge.to.name === name);
+      const already = child.edges.find((edge) => edge.target.name === name);
       if (already) {
-        return;
+        continue;
       }
 
       child.addEdges(pl.childs.find((c) => c.name === name)!);
-    });
-  });
+    }
+  }
 }
 
-function pushChids(src: Payload, dest: Payload) {
-  src.childs.forEach((pl) => {
+function pushChilds(src: Payload, dest: Payload): void {
+  for (const pl of src.childs) {
     const cp = pl.copy();
-    pushChids(cp, dest);
+    pushChilds(cp, dest);
     cp.childs = [];
     dest.childs.push(cp);
-  });
+  }
 }
+
 /**
- * Flatten takes a nested Payload and brings everything down to a single level.
- * It merges all fields that can be merged and deduplicate resources that are similar.
+ * flatten takes a nested Payload and brings everything down to a single level.
+ * It deduplicates components that are strictly similar, and keep references in path.
+ *
+ * If merge = true, it merges all fields that can be merged down to the parent (e.g: dependencies).
+ * Merging is only useful to get a summary of everything at the root level.
  */
-export function flatten(src: Payload): Payload {
+export function flatten(src: Payload, options: { merge?: boolean } = {}): Payload {
   // Generate a flat list of childs
+  const merge = options.merge || false;
   const dest = new Payload({ name: 'flatten', folderPath: '/' });
-  pushChids(src, dest);
+  pushChilds(src, dest);
 
   // Find and merge duplicates
   const duplicates: string[] = [];
-  dest.childs.forEach((childA) => {
+  for (const childA of dest.childs) {
     if (duplicates.includes(childA.id)) {
-      return;
+      continue;
     }
 
     // Check against other child
-    dest.childs.forEach((childB) => {
+    for (const childB of dest.childs) {
       if (childA.id === childB.id) {
-        return;
+        continue;
       }
       if (childA.tech === null || childB.tech === null) {
-        return;
+        continue;
       }
       if (childA.name !== childB.name && childA.tech !== childB.tech) {
-        return;
+        continue;
       }
 
       duplicates.push(childB.id);
       childA.combine(childB);
 
       // Update outdated ref
-      dest.childs.forEach((childC) => {
+      for (const childC of dest.childs) {
         if (childC.inComponent?.id === childB.id) {
           childC.inComponent = childA;
         }
@@ -135,14 +167,14 @@ export function flatten(src: Payload): Payload {
           childC.inComponent = childA;
         }
 
-        childC.edges.forEach((edge) => {
-          if (edge.to.id === childB.id) {
-            edge.to = childA;
+        for (const edge of childC.edges) {
+          if (edge.target.id === childB.id) {
+            edge.target = childA;
           }
-        });
-      });
-    });
-  });
+        }
+      }
+    }
+  }
 
   // Remove duplicates
   dest.childs = dest.childs.filter((child) => {
@@ -152,15 +184,17 @@ export function flatten(src: Payload): Payload {
   findEdgesInDependencies(dest);
 
   // Combine everything with their respective parent
-  dest.childs.forEach((child) => {
-    if (child.parent) {
-      child.parent.combine(child);
+  if (merge === true) {
+    for (const child of dest.childs) {
+      if (child.parent) {
+        child.parent.combine(child);
+      }
+
+      dest.combine(child);
     }
 
-    dest.combine(child);
-  });
-
-  dest.combine(src);
+    dest.combine(src);
+  }
 
   return dest;
 }

@@ -1,31 +1,42 @@
-import core from '@actions/core';
+/* eslint-disable unicorn/filename-case */
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
-import { analyser, FSProvider } from './index.js';
+import { setFailed } from '@actions/core';
+
+import { l } from './common/log.js';
+import { FSProvider, analyser } from './index.js';
+import './autoload.js';
 
 try {
-  console.log('Starting Stack Analyser');
+  l.log('Starting Stack Analyser');
 
-  const token = core.getInput('token', {
-    required: true,
-  });
+  // Because we exec the GitHub Action in a docker env the repo path is in the env var
   const workspace = process.env.GITHUB_WORKSPACE!;
-  console.log('hello', token);
-  console.log('workspace', workspace);
+  l.log('workspace', workspace);
 
+  if (!workspace) {
+    throw new Error('No workspace env specified');
+  }
+
+  // Analyze
   const res = await analyser({
-    provider: new FSProvider({
-      path: workspace,
-      ignorePaths: [],
-    }),
+    provider: new FSProvider({ path: workspace }),
   });
 
-  console.log('Result:', res.toJson(workspace));
+  l.log('Result:', res.toJson(workspace));
 
-  console.log('Done');
-} catch (error: unknown) {
-  if (error instanceof Error) {
-    core.setFailed(error.message);
+  // Output to file
+  const file = path.join(workspace, 'stack-output.json');
+  l.log('Output to file', file);
+
+  await fs.writeFile(file, JSON.stringify(res.toJson(workspace), undefined, 2));
+
+  l.log('Done');
+} catch (err: unknown) {
+  if (err instanceof Error) {
+    setFailed(err.message);
   } else {
-    core.setFailed('Unknown error');
+    setFailed('Unknown error');
   }
 }

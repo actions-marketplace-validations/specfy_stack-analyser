@@ -7,29 +7,54 @@ export interface ProviderFile {
 export interface BaseProvider {
   basePath: string;
   listDir: (pathRelative: string) => Promise<ProviderFile[]>;
-  open: (path: string) => Promise<string>;
+  open: (path: string) => Promise<null | string>;
+  stat: (path: string) => Promise<{ size: number } | null>;
 }
 
 export const IGNORED_DIVE_PATHS = [
   'node_modules',
-  '.git',
-  '.vscode',
   'dist',
   'build',
   'bin',
   'static',
   'public',
   'vendor',
-  '.svn',
+  'terraform.tfstate.d',
+  'migrations',
+  'tests',
+  'e2e',
+  '__fixtures__',
+  '__snapshots__',
+  'tmp',
+
+  // -- Dot folder
+  '.artifacts',
+  '.assets',
+  '.azure',
+  '.azure-pipelines',
+  '.bundle',
+  '.cache',
+  '.changelog',
+  '.devcontainer',
+  '.docker',
+  '.dynamodb',
+  '.fusebox',
+  '.git',
+  // needed to detect github actions
+  // '.github',
+  '.gitlab',
+  '.gradle',
   '.log',
+  '.metadata',
   '.npm',
   '.nuxt',
+  '.react-email',
+  '.release',
+  '.semgrep',
   '.serverless',
-  '.fusebox',
-  '.dynamodb',
-  '.vuepress',
-  'migrations',
-  '.vercel',
+  '.svn',
   '.terraform',
-  'terraform.tfstate.d',
+  '.vercel',
+  '.vscode',
+  '.vuepress',
 ];

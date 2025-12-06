@@ -1,22 +1,25 @@
 import { parse } from 'yaml';
 
+import { l } from '../../../common/log.js';
+import { matchDependencies } from '../../../matchDependencies.js';
 import { Payload } from '../../../payload/index.js';
-import { detect } from '../../../rules.js';
+
 import type { ComponentMatcher } from '../../../types/rule.js';
+import type { AllowedKeys } from '../../../types/techs.js';
 
-const FILES = ['docker-compose.yml'];
+const FILES_REG = /^docker-compose(.*)?\.y(a)?ml$/;
 
+interface DockerCompose {
+  services: Record<string, DockerComposeService>;
+}
 interface DockerComposeService {
   image?: string;
   container_name?: string;
 }
 
-export const detectDockerComponent: ComponentMatcher = async (
-  files,
-  provider
-) => {
+export const detectDockerComponent: ComponentMatcher = async (files, provider) => {
   for (const file of files) {
-    if (!FILES.includes(file.name)) {
+    if (!FILES_REG.test(file.name)) {
       continue;
     }
 
@@ -25,32 +28,42 @@ export const detectDockerComponent: ComponentMatcher = async (
       continue;
     }
 
-    const parsed = parse(content, {});
-    if (!parsed?.services) {
-      return false;
+    let parsed: DockerCompose;
+    try {
+      parsed = parse(content, {}) as DockerCompose;
+      if (!('services' in parsed)) {
+        l.warn('Failed to parse Docker file', file.fp);
+        continue;
+      }
+    } catch (err) {
+      l.warn('Failed to parse', file.fp, err);
+      continue;
     }
 
     const pl = new Payload({ name: 'virtual', folderPath: file.fp });
 
-    for (const [name, service] of Object.entries<DockerComposeService>(
-      parsed.services
-    )) {
+    for (const [name, service] of Object.entries<DockerComposeService>(parsed.services)) {
       if (!service.image) {
         continue;
       }
 
       // If we don't match, it's fine because docker is mostly made for services
       // It's better to have few false positive, than a lot of missing components
-      const matched = [...detect([service.image], 'docker')];
       const [imageName, imageVersion] = service.image.split(':');
+      const matched = [...matchDependencies([imageName], 'docker').entries()];
+      if (imageName.startsWith('$')) {
+        continue;
+      }
 
+      const tech = matched[0] as unknown as [AllowedKeys, string[]] | undefined;
       pl.addChild(
         new Payload({
           name: service.container_name || name,
           folderPath: file.fp,
-          tech: matched[0],
+          tech: tech ? tech[0] : null,
           parent: pl,
           dependencies: [['docker', imageName, imageVersion || 'latest']],
+          reason: tech ? tech[1] : `matched: ${imageName}`,
         })
       );
     }

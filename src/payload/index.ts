@@ -1,31 +1,34 @@
 import path from 'node:path';
 
-import { languages, others } from '../common/languages.js';
+import { detectLang } from '../common/languages.js';
 import { nid } from '../common/nid.js';
-import { listIndexed, nameToKey } from '../common/techs.js';
-import type { BaseProvider } from '../provider/base.js';
+import { rulesComponents } from '../loader.js';
+import { matchAllFiles } from '../matchAllFiles.js';
 import { IGNORED_DIVE_PATHS } from '../provider/base.js';
-import { rulesComponents, rulesTechs } from '../rules.js';
-import { cleanPath } from '../tests/helpers.js';
-import type { Analyser, AnalyserJson } from '../types/index.js';
-import type { AllowedKeys } from '../types/techs.js';
-
-import '../rules/index.js';
+import { listIndexed } from '../register.js';
 import { findHosting, findImplicitComponent } from './helpers.js';
+import { detectInDotEnv } from '../rules/spec/dotenv/index.js';
+import { cleanPath } from '../tests/helpers.js';
+
+import type { BaseProvider } from '../provider/base.js';
+import type { Analyser, AnalyserJson, Dependency } from '../types/index.js';
+import type { AllowedLicenses } from '../types/licenses.js';
+import type { AllowedKeys } from '../types/techs.js';
 
 export class Payload implements Analyser {
   public id;
   public name;
-  public group: Analyser['group'];
   public path;
   public tech;
   public languages: Analyser['languages'];
+  public licenses: Analyser['licenses'];
   public childs: Analyser['childs'];
   public techs: Analyser['techs'];
   public inComponent: Analyser['inComponent'];
   public dependencies: Analyser['dependencies'];
   public edges: Analyser['edges'];
-  public parent?: Payload | null;
+  public parent?: null | Payload;
+  public reason: Set<string>;
 
   constructor({
     id,
@@ -34,69 +37,74 @@ export class Payload implements Analyser {
     parent,
     tech,
     dependencies,
+    reason,
   }: {
     id?: Analyser['id'];
     name: Analyser['name'];
-    folderPath: string;
-    parent?: Payload | null;
+    folderPath: Set<string> | string;
+    parent?: null | Payload;
     tech?: Analyser['tech'];
     dependencies?: Analyser['dependencies'];
+    reason?: string | string[];
   }) {
     this.id = id || nid();
     this.name = name;
-    this.path = [folderPath];
+    this.path = new Set(typeof folderPath === 'string' ? [folderPath] : folderPath);
     this.tech = tech || null;
     this.inComponent = null;
     this.childs = [];
     this.techs = new Set();
     this.languages = {};
-    this.group = 'component';
+    this.licenses = new Set();
     this.dependencies = dependencies || [];
+    this.reason = Array.isArray(reason)
+      ? new Set(reason)
+      : new Set(typeof reason === 'string' ? [reason] : []);
 
     this.parent = parent;
     this.edges = [];
-
-    if (this.tech) {
-      const ref = listIndexed[this.tech];
-      if (ref.type === 'hosting') {
-        this.group = 'hosting';
-      } else if (ref.type === 'sass') {
-        this.group = 'thirdparty';
-      }
-    }
   }
 
   /**
    * Analyze a folder recursively.
    * It will modify the current Payload.
    */
-  async recurse(provider: BaseProvider, filePath: string) {
+  async recurse(provider: BaseProvider, filePath: string): Promise<void> {
     const files = await provider.listDir(filePath);
 
+    // eslint-disable-next-line unicorn/no-this-assignment, @typescript-eslint/no-this-alias
     let ctx: Payload = this;
     for (const rule of rulesComponents) {
       const res = await rule(files, provider);
-      if (!res) {
+      if (res === false) {
         continue;
       }
 
-      if (res.name !== 'virtual') {
-        ctx = res;
-        this.addChild(res);
-      } else {
-        res.childs.forEach((child) => this.addChild(child));
+      const resArray = Array.isArray(res) ? res : [res];
+      for (const pl of resArray) {
+        if (pl.name === 'virtual') {
+          for (const child of pl.childs) {
+            this.addChild(child);
+          }
+          this.combine(pl);
+        } else {
+          ctx = pl;
+          this.addChild(pl);
+        }
       }
+    }
+
+    const dotenv = await detectInDotEnv(files, provider);
+    if (dotenv !== false) {
+      for (const child of dotenv.childs) {
+        this.addChild(child);
+      }
+      this.combine(dotenv);
     }
 
     // Detect Tech
-    for (const rule of rulesTechs) {
-      const res = rule(files);
-      if (!res) {
-        continue;
-      }
-
-      ctx.addTech(res.key);
-    }
+    const matched = matchAllFiles(files, provider.basePath);
+    ctx.addTechs(matched);
 
     // Recursively dive in folders
     for (const file of files) {
@@ -118,114 +126,136 @@ export class Payload implements Analyser {
    * Register a child to this Payload.
    * If a similar child is found at the same level, it will merge them.
    */
-  addChild(service: Payload) {
+  addChild(service: Payload): Payload {
     const exist = this.childs.find((s) => {
+      // we only merge if a tech is similar otherwise it's too easy to get a false-positive
+      if (!s.tech && !service.tech) {
+        return false;
+      }
       if (s.name === service.name) return true;
-      if (s.tech && service.tech && s.tech === service.tech) return true;
+      if (s.tech === service.tech) return true;
       return false;
     });
 
+    if (service.tech?.includes('.')) {
+      const [host] = service.tech.split('.');
+      const tech = listIndexed[host as AllowedKeys];
+      if (tech.type === 'hosting' || tech.type === 'cloud') {
+        const pl = new Payload({
+          name: tech.name,
+          folderPath: service.path,
+          tech: tech.tech,
+          reason: `implicit: ${service.tech}`,
+        });
+        const child = this.addChild(pl);
+        service.inComponent = child;
+      }
+    }
+
     if (exist) {
       // Log all paths were it was found
-      exist.path.push(...service.path);
+      for (const p of service.path) {
+        exist.path.add(p);
+      }
 
       // Update edges to point to the initial component
       if (service.parent) {
         for (const edge of service.parent.edges) {
-          if (edge.to.id !== service.id) {
+          if (edge.target.id !== service.id) {
             continue;
           }
 
-          edge.to = exist;
+          edge.target = exist;
         }
       }
 
       // Merge dependencies
       exist.dependencies = [...exist.dependencies, ...service.dependencies];
 
-      return;
+      return exist;
     }
 
     service.setParent(this);
     this.childs.push(service);
+    return service;
   }
 
   /**
    * Register a tech.
    */
-  addTechs(tech: AllowedKeys[]) {
-    tech.forEach((t) => this.addTech(t));
+  addTechs(tech: Map<AllowedKeys, string[]>): void {
+    for (const [key, reason] of tech.entries()) {
+      this.addTech(key, reason);
+    }
   }
 
   /**
    * Declare this Payload has built with this tech.
    */
-  addTech(tech: AllowedKeys) {
+  addTech(tech: AllowedKeys, reason: string[]): void {
     this.techs.add(tech);
+    for (const r of reason) {
+      this.reason.add(r);
+    }
 
-    findImplicitComponent(this, tech);
+    findImplicitComponent({ pl: this, tech, reason });
     findHosting(this, tech);
   }
 
   /**
    * Register a relationship between this Payload and an other one.
    */
-  addEdges(pl: Payload) {
+  addEdges(pl: Payload): void {
     this.edges.push({
-      to: pl,
-      portSource: 'right',
-      portTarget: 'left',
+      target: pl,
       read: true,
       write: true,
-      vertices: [],
     });
   }
 
   /**
    * Helper to add a lang entry to languages.
    */
-  public addLang(name: string, count: number = 1) {
+  public addLang(name: string, count = 1): void {
     if (!this.languages[name]) {
       this.languages[name] = 0;
     }
 
     this.languages[name] += count;
-
-    if (name in nameToKey) {
-      this.addTech(nameToKey[name]);
-    }
   }
 
   /**
    * Register a parent of this Payload
    */
-  setParent(pl: Payload | null) {
+  setParent(pl: null | Payload): void {
     this.parent = pl;
   }
 
   /**
    * Detect language of a file at this level.
    */
-  detectLang(filename: string) {
-    const ext = path.extname(filename);
-
-    for (const lang of languages) {
-      if (!lang.extensions.includes(ext)) {
-        continue;
-      }
-
+  detectLang(filename: string): void {
+    const lang = detectLang(filename);
+    if (lang) {
       this.addLang(lang.group || lang.name);
-      return;
     }
+  }
 
-    for (const lang of others) {
-      if (!lang.extensions.includes(ext)) {
-        continue;
-      }
-
-      this.addLang(lang.group || lang.name);
-      return;
+  /**
+   * Helper to add a licence entry
+   */
+  public addLicenses(names: Set<AllowedLicenses>): void {
+    for (const name of names) {
+      this.licenses.add(name);
     }
+  }
+
+  combineDependencies(pl: Payload): void {
+    // Merge dependencies
+    const dedup = new Map<string, Dependency>();
+    for (const dep of this.dependencies) dedup.set(dep.join('_'), dep);
+    for (const dep of pl.dependencies) dedup.set(dep.join('_'), dep);
+    this.dependencies = [...dedup.values()];
   }
 
   /**
@@ -235,19 +265,23 @@ export class Payload implements Analyser {
    */
   combine(pl: Payload): void {
     // Log all paths were it was found
-    this.path = [...new Set([...this.path, ...pl.path])];
+    this.path = new Set([...this.path, ...pl.path]);
 
     // Merge dependencies
-    // TODO: dedup
-    this.dependencies = [...this.dependencies, ...pl.dependencies];
+    this.combineDependencies(pl);
 
     for (const [lang, count] of Object.entries(pl.languages)) {
       this.addLang(lang, count);
     }
 
-    pl.techs.forEach((tech) => this.techs.add(tech));
+    for (const tech of pl.techs) {
+      this.techs.add(tech);
+    }
     if (pl.tech) {
       this.techs.add(pl.tech);
+    }
+    for (const licence of pl.licenses) {
+      this.licenses.add(licence);
     }
   }
 
@@ -259,16 +293,17 @@ export class Payload implements Analyser {
     const cp = new Payload({
       id: this.id,
       name: this.name,
-      folderPath: this.path[0],
+      folderPath: this.path,
       parent: this.parent,
       tech: this.tech,
       dependencies: this.dependencies,
     });
-    cp.techs = new Set([...this.techs]);
+    cp.techs = new Set(this.techs);
     cp.inComponent = this.inComponent;
     cp.edges = this.edges;
     cp.path = this.path;
     cp.languages = this.languages;
+    cp.licenses = new Set(this.licenses);
     cp.childs = this.childs;
 
     return cp;
@@ -282,15 +317,14 @@ export class Payload implements Analyser {
    *
    * @param root Absolute path to remove from output
    */
-  toJson(root: string = ''): AnalyserJson {
+  toJson(root = ''): AnalyserJson {
     return {
       id: this.id,
       name: this.name,
-      group: this.group,
-      path: cleanPath(this.path, root),
+      path: cleanPath([...this.path], root),
       tech: this.tech,
       edges: this.edges.map((edge) => {
-        return { ...edge, to: edge.to.id };
+        return { ...edge, target: edge.target.id };
       }),
       inComponent: this.inComponent ? this.inComponent.id : null,
       childs: this.childs
@@ -302,7 +336,9 @@ export class Payload implements Analyser {
         }),
       techs: [...this.techs].sort(),
       languages: this.languages,
+      licenses: [...this.licenses.values()],
       dependencies: this.dependencies,
+      reason: [...this.reason.values()],
     };
   }
 }

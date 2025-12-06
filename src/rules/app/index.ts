@@ -1,5 +1,17 @@
+import './adminer.js';
+import './apacheTika.js';
 import './caddy.js';
+import './consul.js';
+import './discourse.js';
+import './grafana.js';
+import './haproxy.js';
 import './httpd.js';
 import './kibana.js';
+import './kong.js';
+import './mongoexpress.js';
 import './nginx.js';
+import './postgrest.js';
+import './teamspeak.js';
+import './telegraf.js';
+import './traefik.js';
 import './zookeeper.js';

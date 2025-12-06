@@ -1,0 +1,15 @@
+import './adyen.js';
+import './chargebee.js';
+import './google.pay.js';
+import './intuit.js';
+import './klarna.js';
+import './lemonsqueezy.js';
+import './paddle.js';
+import './paypal.js';
+import './paystack.js';
+import './polarsh.js';
+import './revenuecat.js';
+import './squareup.js';
+import './stripe.js';
+import './useautumn.js';
+import './zuora.js';

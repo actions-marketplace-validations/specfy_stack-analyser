@@ -1,7 +1,7 @@
 # ------------------
 # New tmp image
 # ------------------
-FROM node:18.13.0-bullseye-slim AS tmp
+FROM node:20.19.3-bullseye-slim@sha256:de73dedd586ed3ec0784acdbf8b5bda52bbd34707dfe9ed7bd1fc65faee9de8b AS tmp
 
 # Setup the app WORKDIR
 WORKDIR /app/tmp
@@ -40,7 +40,7 @@ RUN true \
 # ---- Web ----
 # Resulting new, minimal image
 # This image must have the minimum amount of layers
-FROM node:18.13.0-bullseye-slim as web
+FROM node:20.19.3-bullseye-slim@sha256:de73dedd586ed3ec0784acdbf8b5bda52bbd34707dfe9ed7bd1fc65faee9de8b as web
 
 ENV PORT=8080
 ENV NODE_ENV=production
@@ -53,11 +53,13 @@ RUN true \
   && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 
 # Do not use root to run the app
-USER node
+# We need to use the root
+# https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners#docker-container-filesystem
+# USER node
 
 WORKDIR /app
 
-COPY --from=tmp --chown=node:node /app/tmp /app
+COPY --from=tmp /app/tmp /app
 
 EXPOSE 8080
 

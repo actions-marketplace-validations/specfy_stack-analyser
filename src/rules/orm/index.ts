@@ -1,0 +1,12 @@
+import './dieselrs.js';
+import './doctrinephp.js';
+import './drizzeleorm.js';
+import './goent.js';
+import './gorm.js';
+import './knex.js';
+import './kysely.js';
+import './prisma.js';
+import './sequelize.js';
+import './sequelruby.js';
+import './sqlalchemy.js';
+import './typeorm.js';
