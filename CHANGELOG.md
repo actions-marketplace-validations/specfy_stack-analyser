@@ -1,3 +1,17 @@
+## [1.27.6](https://github.com/specfy/stack-analyser/compare/v1.27.5...v1.27.6) (2026-01-18)
+
+
+### Bug Fixes
+
+* test helpers ([46aa82c](https://github.com/specfy/stack-analyser/commit/46aa82ce242ed95153bcf61123d1601540f70416))
+
+## [1.27.5](https://github.com/specfy/stack-analyser/compare/v1.27.4...v1.27.5) (2026-01-18)
+
+
+### Bug Fixes
+
+* add more ai stuff ([82b794a](https://github.com/specfy/stack-analyser/commit/82b794a6d60a1ffb20a4e64a4d545c517c27fd05))
+
 ## [1.27.4](https://github.com/specfy/stack-analyser/compare/v1.27.3...v1.27.4) (2025-11-27)
 
 
